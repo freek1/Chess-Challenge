@@ -5,144 +5,97 @@ namespace ChessChallenge.Example
 {
     public class MyBot : IChessBot
     {
+        bool botIsWhite = true;
         // Piece values: null, pawn, knight, bishop, rook, queen, king
         int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+        Random rng = new();
 
         public Move Think(Board board, Timer timer)
         {
+            // TODO: Make everything take up less 'bot memory'
             int depth = 4;
-            int alpha = int.MinValue;  // Initial value for alpha (negative infinity)
-            int beta = int.MaxValue;   // Initial value for beta (positive infinity)
-            Move moveToPlay = RecursiveSearchGPT(board, depth, alpha, beta);
+            botIsWhite = board.IsWhiteToMove;
+
+            Move moveToPlay = RecursiveSearch(board, depth);
             return moveToPlay;
         }
 
-
-        // Recursive search function
-        Move RecursiveSearch(Board board, Move bestMove, int depth)
+        Move RecursiveSearch(Board board, int depth)
         {
-            if (depth == 0)
+            Move bestMove = new Move();
+            int bestEval = int.MinValue;
+
+            Move[] legalMoves = board.GetLegalMoves();
+
+            foreach (Move move in legalMoves)
             {
-                Console.WriteLine($"Depth = 0, returning {bestMove}");
-                return bestMove;
-            }
-
-            int currentEval = Evaluate(board);
-
-            Move[] allMoves = board.GetLegalMoves();
-            foreach (Move move in allMoves)
-            {
-                // Always play checkmate in one
-                if (MoveIsCheckmate(board, move))
-                {
-                    return move;
-                }
-
-                // Do move
                 board.MakeMove(move);
+                int currentEval = -MiniMax(board, depth - 1, int.MinValue + 1, int.MaxValue);
+                board.UndoMove(move);
 
-                // Evaluate new move
-                if (Evaluate(board) > currentEval)
+                if (currentEval > bestEval)
                 {
+                    bestEval = currentEval;
                     bestMove = move;
                 }
-
-                // Undo move
-                board.UndoMove(move);
             }
-
-            // Recurse
-            bestMove = RecursiveSearch(board, bestMove, depth - 1);
 
             return bestMove;
         }
 
-        // Alpha-beta pruning implementation of RecursiveSearch
-        Move RecursiveSearchGPT(Board board, int depth, int alpha, int beta)
+        // TODO: find more efficient search method (alpha-beta/more advanced
+        int MiniMax(Board board, int depth, int alpha, int beta)
         {
             if (depth == 0)
             {
-                Console.WriteLine($"Depth = 0, returning");
-                return new Move(); // Return null instead of bestMove in this case
+                return Evaluate(board);
             }
 
-            Move[] allMoves = board.GetLegalMoves();
+            Move[] legalMoves = board.GetLegalMoves();
 
-            // For simplicity, assume it's the opponent's turn at even depths
-            bool isMaximizing = depth % 2 == 1;
-
-            if (isMaximizing)
+            if (botIsWhite)
             {
-                int bestEval = int.MinValue;
-                Move bestMove = new Move();
-
-                foreach (Move move in allMoves)
+                int maxEval = int.MinValue;
+                foreach (Move move in legalMoves)
                 {
-                    // Always play checkmate in one
                     if (MoveIsCheckmate(board, move))
                     {
-                        return move;
+                        return int.MaxValue;
                     }
-
                     board.MakeMove(move);
-
-                    // Evaluate the move based on the board state after the move
-                    int eval = Evaluate(board);
-
+                    int eval = MiniMax(board, depth - 1, alpha, beta);
                     board.UndoMove(move);
-
-                    if (eval > bestEval)
-                    {
-                        bestEval = eval;
-                        bestMove = move;
-                    }
-
-                    alpha = Math.Max(alpha, bestEval);
+                    maxEval = Math.Max(maxEval, eval);
+                    alpha = Math.Max(alpha, eval);
                     if (beta <= alpha)
                     {
-                        break; // Beta cutoff
+                        break;
                     }
                 }
-
-                return bestMove;
+                return maxEval;
             }
-            else // Minimizing player's turn
+            else
             {
-                int bestEval = int.MaxValue;
-                Move bestMove = new Move();
-
-                foreach (Move move in allMoves)
+                int minEval = int.MaxValue;
+                foreach (Move move in legalMoves)
                 {
-                    // Always play checkmate in one
                     if (MoveIsCheckmate(board, move))
                     {
-                        return move;
+                        return int.MinValue;
                     }
-
                     board.MakeMove(move);
-
-                    // Evaluate the move based on the board state after the move
-                    int eval = Evaluate(board);
-
+                    int eval = MiniMax(board, depth - 1, alpha, beta);
                     board.UndoMove(move);
-
-                    if (eval < bestEval)
-                    {
-                        bestEval = eval;
-                        bestMove = move;
-                    }
-
-                    beta = Math.Min(beta, bestEval);
+                    minEval = Math.Min(minEval, eval);
+                    beta = Math.Min(beta, eval);
                     if (beta <= alpha)
                     {
-                        break; // Alpha cutoff
+                        break;
                     }
                 }
-
-                return bestMove;
+                return minEval;
             }
         }
-
 
         // Test if this move gives checkmate
         bool MoveIsCheckmate(Board board, Move move)
@@ -153,36 +106,22 @@ namespace ChessChallenge.Example
             return isMate;
         }
 
-        // Simple evaluation function of the board.
-        // It sums the values of the pieces.
+        // TODO: implement the trained mini-nn weights as Eval function.
+        // Simple evaluation function; sums the values of the bots pieces and subtracts the value of the oppoenent's pieces.
         int Evaluate(Board board)
         {
             int score = 0;
-            int highestValueCapture = 0;
 
-            for (int i = 0; i <= 63; i++)
+            PieceType[] pieceTypesList = { PieceType.Pawn, PieceType.Knight, PieceType.Bishop, PieceType.Rook, PieceType.Queen };
+            foreach (PieceType pieceType in pieceTypesList)
             {
-                Piece piece = board.GetPiece(new Square(i));
-                int pieceVal = pieceValues[(int)piece.PieceType];
-                if (pieceVal > 0)
-                {
-                    score += pieceVal;
-                }
+                PieceList pieceListBot = board.GetPieceList(pieceType, botIsWhite);
+                PieceList pieceListOpponent = board.GetPieceList(pieceType, !botIsWhite);
+                score += pieceValues[(int)pieceType] * pieceListBot.Count;
+                score -= pieceValues[(int)pieceType] * pieceListOpponent.Count;
             }
 
-            foreach (Move move in board.GetLegalMoves())
-            {
-                // Find highest value capture
-                Piece capturedPiece = board.GetPiece(move.TargetSquare);
-                int capturedPieceValue = pieceValues[(int)capturedPiece.PieceType];
-
-                if (capturedPieceValue > highestValueCapture)
-                {
-                    highestValueCapture = capturedPieceValue;
-                }
-            }
-
-            return score + 2 * highestValueCapture;
+            return score;
         }
     }
 }
