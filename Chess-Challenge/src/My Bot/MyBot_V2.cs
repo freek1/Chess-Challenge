@@ -23,64 +23,11 @@ namespace ChessChallenge.Example
         int[] pieceValues = { 0, 100, 320, 330, 500, 900, 20000 };
         int phase = 24;
 
-        /*
-        int[] pstPawn = {  0,  0,  0,  0,  0,  0,  0,  0,
-                            50, 50, 50, 50, 50, 50, 50, 50,
-                            10, 10, 20, 30, 30, 20, 10, 10,
-                             5,  5, 10, 25, 25, 10,  5,  5,
-                             0,  0,  0, 20, 20,  0,  0,  0,
-                             5, -5,-10,  0,  0,-10, -5,  5,
-                             5, 10, 10,-20,-20, 10, 10,  5,
-                             0,  0,  0,  0,  0,  0,  0,  0 };
-        int[] pstKnight = {-50,-40,-30,-30,-30,-30,-40,-50,
-                            -40,-20,  0,  0,  0,  0,-20,-40,
-                            -30,  0, 10, 15, 15, 10,  0,-30,
-                            -30,  5, 15, 20, 20, 15,  5,-30,
-                            -30,  0, 15, 20, 20, 15,  0,-30,
-                            -30,  5, 10, 15, 15, 10,  5,-30,
-                            -40,-20,  0,  5,  5,  0,-20,-40,
-                            -50,-40,-30,-30,-30,-30,-40,-50};
-        int[] pstBishop = {-20,-10,-10,-10,-10,-10,-10,-20,
-                            -10,  0,  0,  0,  0,  0,  0,-10,
-                            -10,  0,  5, 10, 10,  5,  0,-10,
-                            -10,  5,  5, 10, 10,  5,  5,-10,
-                            -10,  0, 10, 10, 10, 10,  0,-10,
-                            -10, 10, 10, 10, 10, 10, 10,-10,
-                            -10,  5,  0,  0,  0,  0,  5,-10,
-                            -20,-10,-10,-10,-10,-10,-10,-20,};
-        int[] pstRook = {  0,  0,  0,  0,  0,  0,  0,  0,
-                              5, 10, 10, 10, 10, 10, 10,  5,
-                             -5,  0,  0,  0,  0,  0,  0, -5,
-                             -5,  0,  0,  0,  0,  0,  0, -5,
-                             -5,  0,  0,  0,  0,  0,  0, -5,
-                             -5,  0,  0,  0,  0,  0,  0, -5,
-                             -5,  0,  0,  0,  0,  0,  0, -5,
-                              0,  0,  0,  5,  5,  0,  0,  0};
-        int[] pstQueen = {-20,-10,-10, -5, -5,-10,-10,-20,
-                            -10,  0,  0,  0,  0,  0,  0,-10,
-                            -10,  0,  5,  5,  5,  5,  0,-10,
-                             -5,  0,  5,  5,  5,  5,  0, -5,
-                              0,  0,  5,  5,  5,  5,  0, -5,
-                            -10,  5,  5,  5,  5,  5,  0,-10,
-                            -10,  0,  5,  0,  0,  0,  0,-10,
-                            -20,-10,-10, -5, -5,-10,-10,-20};
-        int[] pstKingMid = {-30,-40,-40,-50,-50,-40,-40,-30,
-                            -30,-40,-40,-50,-50,-40,-40,-30,
-                            -30,-40,-40,-50,-50,-40,-40,-30,
-                            -30,-40,-40,-50,-50,-40,-40,-30,
-                            -20,-30,-30,-40,-40,-30,-30,-20,
-                            -10,-20,-20,-20,-20,-20,-20,-10,
-                             20, 20,  0,  0,  0,  0, 20, 20,
-                             20, 30, 10,  0,  0, 10, 30, 20};
-        int[] pstKingEnd = {-50,-40,-30,-20,-20,-30,-40,-50,
-                            -30,-20,-10,  0,  0,-10,-20,-30,
-                            -30,-10, 20, 30, 30, 20,-10,-30,
-                            -30,-10, 30, 40, 40, 30,-10,-30,
-                            -30,-10, 30, 40, 40, 30,-10,-30,
-                            -30,-10, 20, 30, 30, 20,-10,-30,
-                            -30,-30,  0,  0,  0,  0,-30,-30,
-                            -50,-30,-30,-30,-30,-30,-30,-50};
-        */
+        // TODO: 
+        // implement robust stalemate, repetition and 50 move rule detection to prevent drawing
+        // check checkmate check in Evaluation
+        // add iterative deepening!!
+        // add transposition tables!
 
         public Move Think(Board board, Timer timer)
         {
@@ -89,24 +36,26 @@ namespace ChessChallenge.Example
             float alpha = -39999;
             float beta = 39999;
 
-            float score = NegaMax(board, maxDepth, alpha, beta, botIsWhite ? 1 : -1);
+            float score = NegaMax(board, maxDepth, 0, alpha, beta, botIsWhite ? 1 : -1);
 
             phase = ComputePhase(board);
-            Console.WriteLine(phase);
 
             return rootMove;
         }
 
-        float NegaMax(Board board, int depth, float alpha, float beta, int colour)
+        float NegaMax(Board board, int depth, int ply, float alpha, float beta, int colour)
         {
-            if (depth == 0) return Evaluate(board);
+            if (ply > 0 && board.IsRepeatedPosition())
+                return 0;
+            if (depth == 0) 
+                return Evaluate(board, ply);
             float max = -29999;
             float score;
             Move[] legalMoves = board.GetLegalMoves();
             foreach (Move move in legalMoves)
             {
                 board.MakeMove(move);
-                score = -NegaMax(board, depth - 1, -alpha, -beta, -colour);
+                score = -NegaMax(board, depth - 1, ply + 1, -alpha, -beta, -colour);
                 board.UndoMove(move);
 
                 if (score > max)
@@ -134,7 +83,7 @@ namespace ChessChallenge.Example
         }
 
         // Eval function using PeSTO and Tapered Eval
-        float Evaluate(Board board)
+        float Evaluate(Board board, int ply)
         {
             int turn = Convert.ToInt32(board.IsWhiteToMove);
             int[] scoreMiddleGame = { 0, 0 };
@@ -154,6 +103,8 @@ namespace ChessChallenge.Example
                     }
                 }
             }
+
+            if (board.IsInCheckmate()) return (board.IsWhiteToMove ? 1 : -1) * 50000 - ply;
 
             // Tapered Eval
             return (((scoreMiddleGame[turn] - scoreMiddleGame[1 ^ turn]) * (256 - phase)) + ((scoreEndGame[turn] - scoreEndGame[1 ^ turn]) * phase)) / 256;
