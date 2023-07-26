@@ -88,13 +88,18 @@ namespace ChessChallenge.Application
                 controller.StartNewBotMatch(ChallengeController.PlayerType.Human, ChallengeController.PlayerType.V1);
             }
 
+            if (NextButtonInRow("Human vs V2", ref buttonPos, spacing, buttonSize))
+            {
+                controller.StartNewBotMatch(ChallengeController.PlayerType.Human, ChallengeController.PlayerType.V2);
+            }
+
             if (NextButtonInRow("MyBot vs V1", ref buttonPos, spacing, buttonSize)) { 
                 controller.StartNewBotMatch(ChallengeController.PlayerType.MyBot, ChallengeController.PlayerType.V1); 
             }
 
             if (NextButtonInRow("MyBot vs V2", ref buttonPos, spacing, buttonSize))
             {
-                controller.StartNewBotMatch(ChallengeController.PlayerType.MyBot, ChallengeController.PlayerType.V1);
+                controller.StartNewBotMatch(ChallengeController.PlayerType.MyBot, ChallengeController.PlayerType.V2);
             }
         }
     }

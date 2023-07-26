@@ -14,7 +14,7 @@ namespace ChessChallenge.Example
 
         // Load model weights
         string[] stringWeights = System.IO.File.ReadAllLines("C:\\Users\\freek\\source\\repos\\Chess-Challenge\\Chess-Challenge\\src\\My Bot\\geohotz_20k_cpu.txt");
-        float[] weights;
+        //double[] weights;
 
         public Move Think(Board board, Timer timer)
         {
@@ -22,7 +22,7 @@ namespace ChessChallenge.Example
             int depth = 1;
 
             botIsWhite = board.IsWhiteToMove;
-            weights = stringWeights.Select(float.Parse).ToArray().ToArray();
+            //weights = stringWeights.Select(double.Parse).ToArray();
 
             Move moveToPlay = RecursiveSearch(board, depth);
             return moveToPlay;
@@ -120,6 +120,7 @@ namespace ChessChallenge.Example
         {
             int score = 0;
 
+            /*
             float[,,] bitboard = MakeBitboard(board); // Shape is 29 x 8 x 8
 
             float[,] filter1 = new float[3, 3]; // the first 3x3 weights, 32 times
@@ -135,7 +136,7 @@ namespace ChessChallenge.Example
             float[,,] x = new Convolution2DLayer(filter1, 29, 32, 1, 0).Forward(bitboard);
             x = ApplyReLU(x);
 
-
+            */
 
             PieceType[] pieceTypesList = { PieceType.Pawn, PieceType.Knight, PieceType.Bishop, PieceType.Rook, PieceType.Queen };
             foreach (PieceType pieceType in pieceTypesList)
@@ -148,7 +149,7 @@ namespace ChessChallenge.Example
 
             return score;
         }
-
+        /*
         public static float[,,] ApplyReLU(float[,,] tensor)
         {
             int dim1 = tensor.GetLength(0);
@@ -358,6 +359,6 @@ namespace ChessChallenge.Example
                 return output;
             }
         }
-
+        */
     }
 }
