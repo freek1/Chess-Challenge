@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace ChessChallenge.Example
 {
-    public class MyBot : IChessBot
+    public class MyBot_V1 : IChessBot
     {
         bool botIsWhite = true;
         // Piece values: null, pawn, knight, bishop, rook, queen, king

@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using static ChessChallenge.Application.Settings;
 using static ChessChallenge.Application.ConsoleHelper;
 using ChessChallenge.V2Bot;
+using ChessChallenge.V1Bot;
 
 namespace ChessChallenge.Application
 {
@@ -19,7 +20,8 @@ namespace ChessChallenge.Application
         public enum PlayerType
         {
             Human,
-            MyBot,
+            MyBot_V1,
+            MyBot_V2,
             EvilBot,
             V1,
             V2,
@@ -77,7 +79,7 @@ namespace ChessChallenge.Application
             botMatchStartFens = FileHelper.ReadResourceFile("Fens.txt").Split('\n').Where(fen => fen.Length > 0).ToArray();
             botTaskWaitHandle = new AutoResetEvent(false);
 
-            StartNewGame(PlayerType.Human, PlayerType.MyBot);
+            StartNewGame(PlayerType.Human, PlayerType.MyBot_V2);
         }
 
         public void StartNewGame(PlayerType whiteType, PlayerType blackType)
@@ -198,13 +200,13 @@ namespace ChessChallenge.Application
                 boardUI.SetPerspective(PlayerWhite.IsHuman);
                 HumanWasWhiteLastGame = PlayerWhite.IsHuman;
             }
-            else if (PlayerWhite.Bot is MyBot && PlayerBlack.Bot is MyBot)
+            else if (PlayerWhite.Bot is MyBot_V1 && PlayerBlack.Bot is MyBot_V1)
             {
                 boardUI.SetPerspective(true);
             }
             else
             {
-                boardUI.SetPerspective(PlayerWhite.Bot is MyBot);
+                boardUI.SetPerspective(PlayerWhite.Bot is MyBot_V1);
             }
         }
 
@@ -212,8 +214,9 @@ namespace ChessChallenge.Application
         {
             return type switch
             {
-                PlayerType.MyBot => new ChessPlayer(new MyBot(), type, GameDurationMilliseconds),
-                PlayerType.EvilBot => new ChessPlayer(new V1(), type, GameDurationMilliseconds),
+                PlayerType.MyBot_V1 => new ChessPlayer(new MyBot_V1(), type, GameDurationMilliseconds),
+                PlayerType.MyBot_V2 => new ChessPlayer(new MyBot_V2(), type, GameDurationMilliseconds),
+                PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
                 PlayerType.V1 => new ChessPlayer(new V1(), type, GameDurationMilliseconds),
                 PlayerType.V2 => new ChessPlayer(new V2(), type, GameDurationMilliseconds),
                 _ => new ChessPlayer(new HumanPlayer(boardUI), type)
@@ -222,7 +225,7 @@ namespace ChessChallenge.Application
 
         static int GetTokenCount()
         {
-            string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", "MyBot.cs");
+            string path = Path.Combine(Directory.GetCurrentDirectory(), "src", "My Bot", "MyBot_V2.cs");
 
             using StreamReader reader = new(path);
             string txt = reader.ReadToEnd();
