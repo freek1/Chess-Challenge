@@ -19,22 +19,48 @@ namespace ChessChallenge.Example
         bool botIsWhite = true;
         Move rootMove;
         int maxDepth = 6;
-        // From https://www.chessprogramming.org/Simplified_Evaluation_Function
-        int[] pieceValues = { 0, 100, 320, 330, 500, 900, 20000 };
         int phase = 24;
+        float LARGEVAL = 50000;
+
+        // Transposition table stuff
+        private const sbyte EXACT = 0, LOWERBOUND = -1, UPPERBOUND = 1, INVALID = -2;
+        //14 bytes per entry, likely will align to 16 bytes due to padding (if it aligns to 32, recalculate max TP table size)
+        public struct Transposition
+        {
+            public Transposition(ulong zHash, int eval, byte d)
+            {
+                zobristHash = zHash;
+                evaluation = eval;
+                depth = d;
+                flag = INVALID;
+            }
+
+            public ulong zobristHash = 0;
+            public float evaluation = 0;
+            public byte depth = 0;
+            public sbyte flag = INVALID;
+        };
+
+        private static ulong k_TpMask = 0x7FFFFF; //9.4 million entries, likely consuming about 151 MB
+        private Transposition[] m_TPTable = new Transposition[k_TpMask + 1];
+        //To access
+        Transposition Lookup(ulong zHash)
+        {
+            return m_TPTable[zHash & k_TpMask];
+        }
 
         // TODO: 
         // implement robust stalemate, repetition and 50 move rule detection to prevent drawing
         // check checkmate check in Evaluation
         // add iterative deepening!!
-        // add transposition tables!
 
         public Move Think(Board board, Timer timer)
         {
+            Console.WriteLine(m_TPTable);
             botIsWhite = board.IsWhiteToMove;
             rootMove = board.GetLegalMoves()[0]; // To avoid Null moves
-            float alpha = -39999;
-            float beta = 39999;
+            float alpha = -LARGEVAL;
+            float beta = LARGEVAL;
 
             float score = NegaMax(board, maxDepth, 0, alpha, beta, botIsWhite ? 1 : -1);
 
@@ -43,17 +69,30 @@ namespace ChessChallenge.Example
             return rootMove;
         }
 
+
         float NegaMax(Board board, int depth, int ply, float alpha, float beta, int colour)
         {
+            float origAlpha = alpha;
+
+            Transposition ttEntry = Lookup(board.ZobristKey);
+            if (ttEntry.flag != INVALID && ttEntry.depth >= depth)
+            {
+                if (ttEntry.flag == EXACT) return ttEntry.evaluation;
+                if (ttEntry.flag == LOWERBOUND) alpha = Math.Max(alpha, ttEntry.evaluation);
+                if (ttEntry.flag == UPPERBOUND) beta = Math.Min(beta, ttEntry.evaluation);
+            }
+
             if (ply > 0 && board.IsRepeatedPosition())
                 return 0;
-            if (depth == 0) 
+            if (depth == 0 || board.IsInCheckmate())
                 return Evaluate(board, ply);
-            float max = -29999;
+
+            float max = -LARGEVAL;
             float score;
             Move[] legalMoves = board.GetLegalMoves();
             foreach (Move move in legalMoves)
             {
+                // TODO: ORDER MOVES
                 board.MakeMove(move);
                 score = -NegaMax(board, depth - 1, ply + 1, -alpha, -beta, -colour);
                 board.UndoMove(move);
@@ -65,8 +104,18 @@ namespace ChessChallenge.Example
 
                     alpha = Math.Max(alpha, score);
                     if (alpha > beta) break;
+
                 }
+                
+                ttEntry.evaluation = score;
+                if (score <= origAlpha) ttEntry.flag = UPPERBOUND;
+                else if (score >= beta) ttEntry.flag = LOWERBOUND;
+                else ttEntry.flag = EXACT;
+                ttEntry.depth = (byte)depth;
+                m_TPTable.Append(ttEntry);
+
             }
+
             return max;
         }
 
@@ -104,7 +153,10 @@ namespace ChessChallenge.Example
                 }
             }
 
-            if (board.IsInCheckmate()) return (board.IsWhiteToMove ? 1 : -1) * 50000 - ply;
+            if (board.IsInCheckmate()) {
+                Console.WriteLine("found mate in " + ply + " for " + (board.IsWhiteToMove ? 1 : -1));
+                return (board.IsWhiteToMove ? 1 : -1) * (LARGEVAL - ply);
+            }
 
             // Tapered Eval
             return (((scoreMiddleGame[turn] - scoreMiddleGame[1 ^ turn]) * (256 - phase)) + ((scoreEndGame[turn] - scoreEndGame[1 ^ turn]) * phase)) / 256;
