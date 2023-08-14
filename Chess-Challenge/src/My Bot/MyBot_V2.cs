@@ -85,13 +85,12 @@ namespace ChessChallenge.Example
                 return Quiesce(alpha, beta, board, ply);
             }
 
-            float score;
             Move[] legalMoves = board.GetLegalMoves();
             foreach (Move move in legalMoves)
             {
                 // TODO: ORDER MOVES
                 board.MakeMove(move);
-                score = -NegaMax(board, depth - 1, ply + 1, -beta, -alpha, -colour);
+                float score = -NegaMax(board, depth - 1, ply + 1, -beta, -alpha, -colour);
                 board.UndoMove(move);
 
                 if (score >= beta)
@@ -102,8 +101,8 @@ namespace ChessChallenge.Example
                 {
                     // Console.WriteLine("New alpha " + alpha);
                     alpha = score; // Alpha is max
-                    // if (depth == maxDepth)
-                    rootMove = move;
+                    if (depth == maxDepth)
+                        rootMove = move;
                 }
 
                 /*
