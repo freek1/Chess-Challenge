@@ -1,16 +1,7 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Threading.Tasks; // not allowed :(
 using System.Linq;
-using System.Collections.Generic;
-using System.Data;
-using System.Threading.Tasks.Sources;
 using static System.Formats.Asn1.AsnWriter;
-using System.Numerics;
-using System.Net;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Drawing;
-using System.Runtime.InteropServices;
 
 namespace ChessChallenge.Example
 {
@@ -18,9 +9,10 @@ namespace ChessChallenge.Example
     {
         bool botIsWhite = true;
         Move rootMove;
-        int maxDepth = 6;
+        int maxDepth = 3;
         int phase = 24;
-        float LARGEVAL = 50000;
+        float LARGEVAL = 50000F;
+        float max;
 
         // Transposition table stuff
         private const sbyte EXACT = 0, LOWERBOUND = -1, UPPERBOUND = 1, INVALID = -2;
@@ -56,24 +48,24 @@ namespace ChessChallenge.Example
 
         public Move Think(Board board, Timer timer)
         {
-            Console.WriteLine(m_TPTable);
             botIsWhite = board.IsWhiteToMove;
             rootMove = board.GetLegalMoves()[0]; // To avoid Null moves
             float alpha = -LARGEVAL;
             float beta = LARGEVAL;
-
-            float score = NegaMax(board, maxDepth, 0, alpha, beta, botIsWhite ? 1 : -1);
-
+            max = -LARGEVAL;
             phase = ComputePhase(board);
+
+            float score = NegaMax(board, maxDepth, 0, alpha, beta, 1);
+            Console.WriteLine(score);
 
             return rootMove;
         }
-
 
         float NegaMax(Board board, int depth, int ply, float alpha, float beta, int colour)
         {
             float origAlpha = alpha;
 
+            /*
             Transposition ttEntry = Lookup(board.ZobristKey);
             if (ttEntry.flag != INVALID && ttEntry.depth >= depth)
             {
@@ -82,41 +74,71 @@ namespace ChessChallenge.Example
                 if (ttEntry.flag == UPPERBOUND) beta = Math.Min(beta, ttEntry.evaluation);
             }
 
+            
             if (ply > 0 && board.IsRepeatedPosition())
-                return 0;
-            if (depth == 0 || board.IsInCheckmate())
-                return Evaluate(board, ply);
+            {
+                return -5;
+            }
+            */
+            if (depth == 0)
+            {
+                return Quiesce(alpha, beta, board, ply);
+            }
 
-            float max = -LARGEVAL;
             float score;
             Move[] legalMoves = board.GetLegalMoves();
             foreach (Move move in legalMoves)
             {
                 // TODO: ORDER MOVES
                 board.MakeMove(move);
-                score = -NegaMax(board, depth - 1, ply + 1, -alpha, -beta, -colour);
+                score = -NegaMax(board, depth - 1, ply + 1, -beta, -alpha, -colour);
                 board.UndoMove(move);
 
-                if (score > max)
+                if (score >= beta)
                 {
-                    max = score;
-                    if (depth == maxDepth) rootMove = move;
-
-                    alpha = Math.Max(alpha, score);
-                    if (alpha > beta) break;
-
+                    return beta; // Fail hard beta cut-off
                 }
-                
+                if (score > alpha)
+                {
+                    // Console.WriteLine("New alpha " + alpha);
+                    alpha = score; // Alpha is max
+                    // if (depth == maxDepth)
+                    rootMove = move;
+                }
+
+                /*
                 ttEntry.evaluation = score;
-                if (score <= origAlpha) ttEntry.flag = UPPERBOUND;
-                else if (score >= beta) ttEntry.flag = LOWERBOUND;
+                if (alpha <= origAlpha) ttEntry.flag = UPPERBOUND;
+                else if (alpha >= beta) ttEntry.flag = LOWERBOUND;
                 else ttEntry.flag = EXACT;
                 ttEntry.depth = (byte)depth;
-                m_TPTable.Append(ttEntry);
-
+                m_TPTable[board.ZobristKey & 0x7FFFFF] = ttEntry;
+                */
             }
 
-            return max;
+            return alpha;
+        }
+
+        float Quiesce(float alpha, float beta, Board board, int ply)
+        {
+            float stand_pat = Evaluate(board, ply);
+            if (stand_pat >= beta)
+                return beta;
+            if (alpha < stand_pat)
+                alpha = stand_pat;
+
+            Move[] captures = board.GetLegalMoves(true);
+            foreach(Move capture in captures) {
+                board.MakeMove(capture);
+                float score = -Quiesce(-beta, -alpha, board, ply);
+                board.UndoMove(capture);
+
+                if (score >= beta)
+                    return beta;
+                if (score > alpha)
+                    alpha = score;
+            }
+            return alpha;
         }
 
         // PeSTO Evaluation Function
@@ -154,8 +176,8 @@ namespace ChessChallenge.Example
             }
 
             if (board.IsInCheckmate()) {
-                Console.WriteLine("found mate in " + ply + " for " + (board.IsWhiteToMove ? 1 : -1));
-                return (board.IsWhiteToMove ? 1 : -1) * (LARGEVAL - ply);
+                // Console.WriteLine("Found mate in " + ply + " for " + (botIsWhite ? "Bot" : "Opponent"));
+                return (botIsWhite ? 1 : -1) * (LARGEVAL - ply);
             }
 
             // Tapered Eval
