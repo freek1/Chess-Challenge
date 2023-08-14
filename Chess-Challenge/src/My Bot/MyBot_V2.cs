@@ -1,7 +1,5 @@
 ﻿using ChessChallenge.API;
 using System;
-using System.Linq;
-using static System.Formats.Asn1.AsnWriter;
 
 namespace ChessChallenge.Example
 {
@@ -14,23 +12,13 @@ namespace ChessChallenge.Example
         float LARGEVAL = 50000F;
         float max;
 
-        // Transposition table stuff
-        private const sbyte EXACT = 0, LOWERBOUND = -1, UPPERBOUND = 1, INVALID = -2;
-        //14 bytes per entry, likely will align to 16 bytes due to padding (if it aligns to 32, recalculate max TP table size)
-        public struct Transposition
+        struct Transposition
         {
-            public Transposition(ulong zHash, int eval, byte d)
-            {
-                zobristHash = zHash;
-                evaluation = eval;
-                depth = d;
-                flag = INVALID;
-            }
-
-            public ulong zobristHash = 0;
-            public float evaluation = 0;
-            public byte depth = 0;
-            public sbyte flag = INVALID;
+            public ulong zobristHash;
+            public Move move;
+            public int evaluation;
+            public sbyte depth;
+            public byte flag;
         };
 
         private static ulong k_TpMask = 0x7FFFFF; //9.4 million entries, likely consuming about 151 MB
@@ -65,21 +53,24 @@ namespace ChessChallenge.Example
         {
             float origAlpha = alpha;
 
-            /*
+            ref Transposition transposition = ref m_TPTable[board.ZobristKey & 0x7FFFFF];
+
             Transposition ttEntry = Lookup(board.ZobristKey);
-            if (ttEntry.flag != INVALID && ttEntry.depth >= depth)
+            if (transposition.zobristHash == board.ZobristKey && transposition.depth >= depth)
             {
-                if (ttEntry.flag == EXACT) return ttEntry.evaluation;
-                if (ttEntry.flag == LOWERBOUND) alpha = Math.Max(alpha, ttEntry.evaluation);
-                if (ttEntry.flag == UPPERBOUND) beta = Math.Min(beta, ttEntry.evaluation);
+                //If we have an "exact" score (a < score < beta) just use that
+                if (transposition.flag == 1) return transposition.evaluation;
+                //If we have a lower bound better than beta, use that
+                if (transposition.flag == 2 && transposition.evaluation >= beta) return transposition.evaluation;
+                //If we have an upper bound worse than alpha, use that
+                if (transposition.flag == 3 && transposition.evaluation <= alpha) return transposition.evaluation;
             }
 
-            
             if (ply > 0 && board.IsRepeatedPosition())
             {
                 return -5;
             }
-            */
+            
             if (depth == 0)
             {
                 return Quiesce(alpha, beta, board, ply);
@@ -105,14 +96,19 @@ namespace ChessChallenge.Example
                         rootMove = move;
                 }
 
-                /*
-                ttEntry.evaluation = score;
-                if (alpha <= origAlpha) ttEntry.flag = UPPERBOUND;
-                else if (alpha >= beta) ttEntry.flag = LOWERBOUND;
-                else ttEntry.flag = EXACT;
-                ttEntry.depth = (byte)depth;
-                m_TPTable[board.ZobristKey & 0x7FFFFF] = ttEntry;
-                */
+
+                transposition.evaluation = (int)alpha;
+                transposition.zobristHash = board.ZobristKey;
+                transposition.move = rootMove;
+                if (alpha < origAlpha)
+                    transposition.flag = 3; //upper bound
+                else if (alpha >= beta)
+                {
+                    transposition.flag = 2; //lower bound
+                }
+                else transposition.flag = 1; //"exact" score
+                transposition.depth = (sbyte)depth;
+
             }
 
             return alpha;
