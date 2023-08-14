@@ -9,8 +9,8 @@ namespace ChessChallenge.Example
         Move rootMove;
         int maxDepth = 3;
         int phase = 24;
-        float LARGEVAL = 50000F;
-        float max;
+        int LARGEVAL = 50000;
+        int max;
 
         struct Transposition
         {
@@ -23,11 +23,6 @@ namespace ChessChallenge.Example
 
         private static ulong k_TpMask = 0x7FFFFF; //9.4 million entries, likely consuming about 151 MB
         private Transposition[] m_TPTable = new Transposition[k_TpMask + 1];
-        //To access
-        Transposition Lookup(ulong zHash)
-        {
-            return m_TPTable[zHash & k_TpMask];
-        }
 
         // TODO: 
         // implement robust stalemate, repetition and 50 move rule detection to prevent drawing
@@ -38,24 +33,23 @@ namespace ChessChallenge.Example
         {
             botIsWhite = board.IsWhiteToMove;
             rootMove = board.GetLegalMoves()[0]; // To avoid Null moves
-            float alpha = -LARGEVAL;
-            float beta = LARGEVAL;
+            int alpha = -LARGEVAL;
+            int beta = LARGEVAL;
             max = -LARGEVAL;
             phase = ComputePhase(board);
 
-            float score = NegaMax(board, maxDepth, 0, alpha, beta, 1);
+            int score = NegaMax(board, maxDepth, 0, alpha, beta, 1);
             Console.WriteLine(score);
 
             return rootMove;
         }
 
-        float NegaMax(Board board, int depth, int ply, float alpha, float beta, int colour)
+        int NegaMax(Board board, int depth, int ply, int alpha, int beta, int colour)
         {
-            float origAlpha = alpha;
+            int origAlpha = alpha;
 
             ref Transposition transposition = ref m_TPTable[board.ZobristKey & 0x7FFFFF];
 
-            Transposition ttEntry = Lookup(board.ZobristKey);
             if (transposition.zobristHash == board.ZobristKey && transposition.depth >= depth)
             {
                 //If we have an "exact" score (a < score < beta) just use that
@@ -73,7 +67,7 @@ namespace ChessChallenge.Example
             
             if (depth == 0)
             {
-                return Quiesce(alpha, beta, board, ply);
+                return Quiesce(alpha, beta, board, ply, colour);
             }
 
             Move[] legalMoves = board.GetLegalMoves();
@@ -81,7 +75,7 @@ namespace ChessChallenge.Example
             {
                 // TODO: ORDER MOVES
                 board.MakeMove(move);
-                float score = -NegaMax(board, depth - 1, ply + 1, -beta, -alpha, -colour);
+                int score = -NegaMax(board, depth - 1, ply + 1, -beta, -alpha, -colour);
                 board.UndoMove(move);
 
                 if (score >= beta)
@@ -114,9 +108,9 @@ namespace ChessChallenge.Example
             return alpha;
         }
 
-        float Quiesce(float alpha, float beta, Board board, int ply)
+        int Quiesce(int alpha, int beta, Board board, int ply, int colour)
         {
-            float stand_pat = Evaluate(board, ply);
+            int stand_pat = Evaluate(board, ply, colour);
             if (stand_pat >= beta)
                 return beta;
             if (alpha < stand_pat)
@@ -125,7 +119,7 @@ namespace ChessChallenge.Example
             Move[] captures = board.GetLegalMoves(true);
             foreach(Move capture in captures) {
                 board.MakeMove(capture);
-                float score = -Quiesce(-beta, -alpha, board, ply);
+                int score = -Quiesce(-beta, -alpha, board, ply, -colour);
                 board.UndoMove(capture);
 
                 if (score >= beta)
@@ -149,7 +143,7 @@ namespace ChessChallenge.Example
         }
 
         // Eval function using PeSTO and Tapered Eval
-        float Evaluate(Board board, int ply)
+        int Evaluate(Board board, int ply, int colour)
         {
             int turn = Convert.ToInt32(board.IsWhiteToMove);
             int[] scoreMiddleGame = { 0, 0 };
@@ -171,12 +165,12 @@ namespace ChessChallenge.Example
             }
 
             if (board.IsInCheckmate()) {
-                // Console.WriteLine("Found mate in " + ply + " for " + (botIsWhite ? "Bot" : "Opponent"));
-                return (botIsWhite ? 1 : -1) * (LARGEVAL - ply);
+                Console.WriteLine("Found mate in " + ply + " for " + (colour == 1 ? "Bot " : "Opponent ") + colour * (LARGEVAL - ply));
+                return colour * (LARGEVAL - ply);
             }
 
             // Tapered Eval
-            return (((scoreMiddleGame[turn] - scoreMiddleGame[1 ^ turn]) * (256 - phase)) + ((scoreEndGame[turn] - scoreEndGame[1 ^ turn]) * phase)) / 256;
+            return colour * (((scoreMiddleGame[turn] - scoreMiddleGame[1 ^ turn]) * (256 - phase)) + ((scoreEndGame[turn] - scoreEndGame[1 ^ turn]) * phase)) / 256;
         }
 
         // Compute phase of the game (opening -> ending).
